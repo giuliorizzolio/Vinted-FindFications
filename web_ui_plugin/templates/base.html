@@ -187,6 +187,11 @@
                         </a>
                     </li>
                     <li class="nav-item">
+                        <a class="nav-link {% if request.path == '/catalogo' %}active{% endif %}" href="/catalogo">
+                            <i class="bi bi-search me-2"></i> Catalogo
+                        </a>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link {% if request.path == '/items' %}active{% endif %}" href="/items">
                             <i class="bi bi-box me-2"></i> Items
                         </a>
