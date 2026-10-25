@@ -542,3 +542,8 @@ def web_ui_process():
         logger.info("Web UI process stopped")
     except Exception as e:
         logger.error(f"Error in web UI process: {e}", exc_info=True)
+
+
+# Optional on-demand catalog route; notifications remain untouched.
+from web_ui_plugin.catalog_routes import catalogo_bp
+app.register_blueprint(catalogo_bp)
