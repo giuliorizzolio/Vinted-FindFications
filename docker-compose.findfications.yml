@@ -1,0 +1,19 @@
+# Replace the existing Portainer stack's editor contents, keeping the SAME stack name.
+# Do not deploy as a second stack.
+services:
+  vinted-notifications:
+    image: ghcr.io/giuliorizzolio/vinted-findfications:catalogo
+    pull_policy: always
+    ports:
+      - "8001:8000"
+      - "8081:8080"
+    volumes:
+      - VN_data:/app/data
+      - VN_logs:/app/logs
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+volumes:
+  VN_data:
+  VN_logs:
