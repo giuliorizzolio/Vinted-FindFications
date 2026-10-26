@@ -1,5 +1,5 @@
-# Replace the existing Portainer stack's editor contents, keeping the SAME stack name.
-# Do not deploy as a second stack.
+# Aggiorna lo stack Portainer esistente; NON crearne un secondo.
+# Definisci APIFY_TOKEN nella sezione Environment variables dello stack.
 services:
   vinted-notifications:
     image: ghcr.io/giuliorizzolio/vinted-findfications:catalogo
@@ -7,6 +7,10 @@ services:
     ports:
       - "8001:8000"
       - "8081:8080"
+    environment:
+      APIFY_TOKEN: "${APIFY_TOKEN:-}"
+      # False = solo ricerche manuali. True = monitor automatico a pagamento.
+      APIFY_AUTO_ENABLED: "${APIFY_AUTO_ENABLED:-false}"
     volumes:
       - VN_data:/app/data
       - VN_logs:/app/logs
