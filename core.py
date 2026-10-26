@@ -358,7 +358,7 @@ def clear_item_queue(items_queue, new_items_queue):
                 )
                 new_items_queue.put((content, item.url, "Open Vinted", None, None))
             return
-        data, query_id = items_queue.get()
+        data, query_id = payload
         banwords_str = db.get_parameter("banwords")
         for item in reversed(data):
 
