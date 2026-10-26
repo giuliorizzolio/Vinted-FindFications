@@ -2,6 +2,8 @@
 import re
 from urllib.parse import urlparse, urlencode
 from pyVintedVN import Vinted
+from apify_catalog import available, fetch_rows, normalize_row, CatalogProviderError
+
 
 VINTED_HOST = re.compile(r"^(?:www\.)?vinted\.[a-z]{2,3}$", re.I)
 
@@ -18,19 +20,37 @@ def build_url(search):
         return search
     return "https://www.vinted.it/catalog?" + urlencode({"search_text": search, "order": "newest_first"})
 
-def search_catalog(search, pages=1, include="", exclude="", max_price=None):
+def search_catalog(search, pages=1, include="", exclude="", max_price=None, with_details=False):
     """Return (matching listings, examined count), without persisting or notifying."""
     url = build_url(search)
     pages = max(1, min(int(pages), 3))
     include_terms = [t.strip().casefold() for t in include.split(",") if t.strip()]
     exclude_terms = [t.strip().casefold() for t in exclude.split(",") if t.strip()]
     found, seen, examined = [], set(), 0
-    client = Vinted()
-    for page in range(1, pages + 1):
-        items = client.items.search(url, nbr_items=40, page=page)
-        if not items:
-            break
-        for item in items:
+    if not available():
+        raise CatalogProviderError(
+            "Il vecchio motore Vinted non è più disponibile. Configura APIFY_TOKEN in Portainer."
+        )
+    items = fetch_rows(url, max_items=pages * 40, with_details=with_details)
+    for raw in items:
+        try:
+            item = normalize_row(raw)
+        except ValueError:
+            continue
+        if item["id"] in seen:
+            continue
+        seen.add(item["id"])
+        examined += 1
+        title = (item["title"] + " " + (item["description"] if with_details else "")).casefold()
+        if any(term not in title for term in include_terms):
+            continue
+        if any(term in title for term in exclude_terms):
+            continue
+        if max_price is not None and item["price"] > max_price:
+            continue
+        found.append(item)
+    return found, examined
+
             if str(item.id) in seen:
                 continue
             seen.add(str(item.id))
