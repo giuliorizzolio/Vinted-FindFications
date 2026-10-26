@@ -1,7 +1,6 @@
 """On-demand catalog search. Does not touch notification queries or item history."""
 import re
 from urllib.parse import urlparse, urlencode
-from pyVintedVN import Vinted
 from apify_catalog import available, fetch_rows, normalize_row, CatalogProviderError
 
 
@@ -51,22 +50,3 @@ def search_catalog(search, pages=1, include="", exclude="", max_price=None, with
         found.append(item)
     return found, examined
 
-            if str(item.id) in seen:
-                continue
-            seen.add(str(item.id))
-            examined += 1
-            # The catalog API wrapper currently exposes titles, not full descriptions.
-            title = (item.title or "").casefold()
-            if any(term not in title for term in include_terms):
-                continue
-            if any(term in title for term in exclude_terms):
-                continue
-            try:
-                price = float(item.price)
-            except (ValueError, TypeError):
-                continue
-            if max_price is not None and price > max_price:
-                continue
-            found.append({"title": item.title, "price": price, "currency": item.currency,
-                          "url": item.url, "photo": item.photo})
-    return found, examined
