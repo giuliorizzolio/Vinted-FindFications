@@ -3,6 +3,7 @@
 {% block content %}
 <div class="pt-3 pb-2 mb-3 border-bottom"><h1 class="h2">Cerca nel catalogo</h1></div>
 <p class="text-muted">Ricerca manuale: parte soltanto quando premi Cerca. Non salva ricerche, non modifica Notifications e non invia notifiche.</p>
+{% if not provider_ready %}<div class="alert alert-warning">La ricerca dal server è bloccata da Vinted. Configura APIFY_TOKEN in Portainer per usare il provider esterno Apify. Ogni ricerca può consumare crediti.</div>{% endif %}
 <form method="post" action="/catalogo" class="card card-body mb-4">
   <div class="mb-3">
     <label class="form-label" for="search">Parole da cercare o URL di ricerca Vinted con filtri</label>
@@ -18,9 +19,13 @@
     <div class="col-md-2"><label class="form-label" for="pages">Pagine (max 3)</label>
       <select class="form-select" name="pages" id="pages">{% for p in [1,2,3] %}<option value="{{ p }}" {% if filters.pages == p %}selected{% endif %}>{{ p }}</option>{% endfor %}</select></div>
   </div>
+  <div class="form-check mt-3">
+    <input class="form-check-input" type="checkbox" name="with_details" id="with_details" value="1" {% if filters.with_details %}checked{% endif %}>
+    <label class="form-check-label" for="with_details">Carica anche le descrizioni (costo extra per annuncio)</label>
+  </div>
   <div class="mt-3"><button type="submit" class="btn btn-primary"><i class="bi bi-search me-1"></i> Cerca</button></div>
 </form>
-<div class="alert alert-info">I filtri avanzati controllano <strong>solo il titolo</strong>: la libreria attuale non carica la descrizione completa. Le pagine disponibili dipendono da Vinted.</div>
+<div class="alert alert-info">I filtri controllano il titolo; se attivi il caricamento delle descrizioni, controllano anche quelle. Il provider può addebitare costi per ogni ricerca e dettaglio.</div>
 {% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
 {% if searched %}
 <h2 class="h4">{{ results|length }} risultati su {{ examined }} annunci esaminati</h2>
