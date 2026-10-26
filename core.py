@@ -1,4 +1,8 @@
 import db
+import os
+import time
+from types import SimpleNamespace
+from apify_catalog import available, fetch_rows, normalize_row, CatalogProviderError
 import requests
 from pyVintedVN import Vinted, requester
 from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
@@ -286,21 +290,41 @@ def process_items(queue):
         None
     """
 
-    all_queries = db.get_queries()
+    if not available() or os.environ.get("APIFY_AUTO_ENABLED", "false").lower() != "true":
+        return  # Direct Vinted API was retired; never retry its Cloudflare challenge.
 
-    # Initialize Vinted
-    vinted = Vinted()
+    items_per_query = max(1, min(120, int(db.get_parameter("items_per_query") or 20)))
+    for query in db.get_queries():
+        query_id, url = query[0], query[1]
+        marker = "apify_initialized_" + str(query_id)
+        baseline = db.get_parameter(marker) != "1"
+        try:
+            rows = fetch_rows(
+                url, max_items=items_per_query,
+                monitor_key="findfications-query-" + str(query_id),
+            )
+        except CatalogProviderError as exc:
+            logger.warning("Apify monitor not available for query %s: %s", query_id, exc)
+            continue
 
-    # Get the number of items per query from the database
-    items_per_query = int(db.get_parameter("items_per_query"))
-
-    # for each keyword we parse data
-    for query in all_queries:
-        all_items = vinted.items.search(query[1], nbr_items=items_per_query)
-        # Filter to only include new items. This should reduce the amount of db calls.
-        data = [item for item in all_items if item.is_new_item()]
-        queue.put((data, query[0]))
-        logger.info(f"Scraped {len(data)} items for query: {query[1]}")
+        items = []
+        for raw in rows:
+            try:
+                item = normalize_row(raw)
+            except ValueError:
+                continue
+            items.append(SimpleNamespace(**item))
+        queue.put((items, query_id, baseline))
+        # This marker is stored in the existing database; no schema change.
+        with db.get_db_connection() as connection:
+            connection.execute(
+                "INSERT OR REPLACE INTO parameters(key, value) VALUES (?, ?)",
+                (marker, "1"),
+            )
+        logger.info(
+            "Apify monitor: query %s returned %d items (baseline=%s)",
+            query_id, len(items), baseline,
+        )
 
 
 def clear_item_queue(items_queue, new_items_queue):
@@ -309,7 +333,32 @@ def clear_item_queue(items_queue, new_items_queue):
     This function is scheduled to run frequently.
     """
     if not items_queue.empty():
-        data, query_id = items_queue.get()
+        payload = items_queue.get()
+        if len(payload) == 3:
+            data, query_id, baseline = payload
+            banwords_str = db.get_parameter("banwords")
+            for item in reversed(data):
+                if db.is_item_in_db_by_id(item.id) or (
+                    banwords_str and contains_banwords(item.title, banwords_str)
+                ):
+                    continue
+                now = int(time.time())
+                db.add_item_to_db(
+                    id=item.id, timestamp=now,
+                    price=item.price, title=item.title,
+                    photo_url=item.photo, query_id=query_id,
+                    currency=item.currency,
+                )
+                if baseline:
+                    continue  # Seed known items without alerting old listings.
+                message_template = db.get_parameter("message_template") or "{title} - {price}"
+                content = message_template.format(
+                    title=item.title, price=str(item.price) + " " + item.currency,
+                    brand=item.brand, image=item.photo or "",
+                )
+                new_items_queue.put((content, item.url, "Open Vinted", None, None))
+            return
+        data, query_id = payload
         banwords_str = db.get_parameter("banwords")
         for item in reversed(data):
 
