@@ -22,6 +22,14 @@ from rss_feed_plugin.rss_feed import rss_feed_process
 from web_ui_plugin.web_ui import web_ui_process
 
 
+def configured_refresh_delay():
+    """Enforce a provider polling floor to limit external API charges."""
+    delay = int(db.get_parameter("query_refresh_delay") or 60)
+    if os.environ.get("APIFY_AUTO_ENABLED", "false").lower() == "true":
+        return max(1800, delay)
+    return delay
+
+
 # Global process references
 telegram_process = None
 rss_process = None
@@ -33,7 +41,7 @@ def scraper_process(items_queue):
     logger.info("Scrape process started")
 
     # Get the query refresh delay from the database
-    current_query_refresh_delay = int(db.get_parameter("query_refresh_delay"))
+    current_query_refresh_delay = configured_refresh_delay()
     logger.info(f"Using query refresh delay of {current_query_refresh_delay} seconds")
 
     scraper_scheduler = BackgroundScheduler()
@@ -108,7 +116,7 @@ def check_refresh_delay(items_queue):
 
     # Get the current value from the database
     try:
-        new_delay = int(db.get_parameter("query_refresh_delay"))
+        new_delay = configured_refresh_delay()
 
         # If the delay has changed, update the scheduler
         if new_delay != current_query_refresh_delay:
@@ -226,7 +234,7 @@ if __name__ == "__main__":
 
     # 1. Create and start the scrape process
     # This process will scrape items and put them in the items_queue
-    current_query_refresh_delay = int(db.get_parameter("query_refresh_delay"))
+    current_query_refresh_delay = configured_refresh_delay()
     scrape_process = multiprocessing.Process(
         target=scraper_process, args=(items_queue,)
     )
